@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sudoku Helper</title>
+        <script>
+
+            window.onload = function()
+            {
+                var solved = false;
+                var data = "[";
+                var solver;
+                for($x = 1; $x <= 9; $x++)
+                {
+                    for($y = 1; $y <= 9; $y++)
+                    {
+                        data += '{"x":'+ $x+ ',"y":' + $y + ',"v":"0","note":"1 2 3 4 5 6 7 8 9 "},';
+                    }   
+                }
+                data = JSON.parse(data.substr(0,data.length - 1) + "]");
+
+                gameCells = Array(Array(9),Array(9),Array(9),Array(9),Array(9),Array(9),Array(9),Array(9),Array(9));
+
+                gameSetup();
+                gamePlay();
+
+                function gameSetup()
+                {
+                    const game = document.getElementById("game");
+                    for($x = 1; $x <= 9; $x++)
+                    {
+                        for($y = 1; $y <= 9; $y++)
+                        {
+                            var cell = document.createElement("div");
+                            cell.classList.add("cell");
+                            if($x <=3 && ($y <=3 || $y >=7) || $x >= 7 && ($y <=3 || $y >=7) || ($x >= 4 && $x<= 6 && $y >=4 && $y <=6))
+                            {
+                                cell.classList.add("grid--light");
+                            }
+                            cell.setAttribute("x", $x);
+                            cell.setAttribute("y", $y);
+                            cell.id = $x + "x" + $y;
+                            game.appendChild(cell);
+                        }
+                    }
+
+                    for($x = 1; $x <= 9; $x++)
+                    {
+                        var cell = document.createElement("div");
+                        cell.classList.add("cell");
+                        cell.classList.add("input");
+                        cell.innerText = $x;
+                        game.appendChild(cell);
+                    }
+
+                    var buttons = document.createElement("div");
+                    buttons.className = "buttons";
+                    buttons.id = "buttons";
+                    game.appendChild(buttons);
+
+                    var solve = document.createElement("button");
+                    solve.id = "solve";
+                    solve.innerText = "Solve";
+                    buttons.appendChild(solve);
+
+                    var reset = document.createElement("button");
+                    reset.id = "reset";
+                    reset.innerText = "Reset";
+                    buttons.appendChild(reset);
+
+                    var demo = document.createElement("button");
+                    demo.id = "demo";
+                    demo.innerText = "Demo";
+                    buttons.appendChild(demo);
+
+                    gameReset();
+                }
+
+                function gamePlay()
+                {
+                    var input = "";
+                    const cells = document.querySelectorAll(".cell");
+                    cells.forEach((cell)=>
+                    {
+                        cell.addEventListener("click", function()
+                        {
+                            clearInterval(solver);
+                            if(cell.classList.contains("input"))
+                            {
+                                const inputCells = document.querySelectorAll(".input");
+                                inputCells.forEach((inputCell) => inputCell.classList.remove("active"));
+                                input = cell.innerText;
+                                cell.classList.add("active");
+                            }
+                            else
+                            {
+                                if(input != "")
+                                {
+                                    if(cell.innerText == input)
+                                    {
+                                        cell.innerText = "";
+                                        cell.classList.remove("filled");
+                                    }
+                                    else
+                                    {
+                                        cell.innerText = input;
+                                        cell.classList.add("filled");
+                                    }
+                                }
+                            }
+                        });
+                    });
+                    
+                    const solve = document.getElementById("solve");
+                    solve.addEventListener("click", function()
+                    {
+                        gameSolve();
+                    });
+
+                    const reset = document.getElementById("reset");
+                    reset.addEventListener("click", function()
+                    {
+                        gameReset();
+                    });
+                
+                    const demo = document.getElementById("demo");
+                    demo.addEventListener("click", function()
+                    {
+                        gameReset();
+                        demoSetup();
+                    })
+                
+                }
+
+                function gameSolve()
+                {
+                    solved = false;
+                    solver = setInterval(function(){getNotes();}, 100);
+                }
+
+                function getNotes()
+                {
+                    const cells = document.querySelectorAll(".cell");
+                    var index = 0;
+                    var target = "";
+                    cells.forEach((cell) =>
+                    {
+                        $cx = parseInt(cell.getAttribute("x")) - 1;
+                        $cy = parseInt(cell.getAttribute("y")) - 1;
+                        if(cell.classList.contains("filled"))
+                        {
+                            gameCells[$cx][$cy] = cell.innerText;
+
+                            // Loop through Left to Right, Top to Bottom
+                            for($x = 0; $x < 9; $x++)
+                            {
+                                gameCells[$x][$cy] = gameCells[$x][$cy].replace(cell.innerText, "");
+                                gameCells[$cx][$x] = gameCells[$cx][$x].replace(cell.innerText, "");
+                            }
+
+                            // Loop through each 3x3 grid
+                            for($xx = 0; $xx < 3; $xx++)
+                            {
+                                for($yy = 0; $yy < 3; $yy++)
+                                {
+                                    if($cx >= $xx * 3 && $cx < ($xx * 3) + 3)
+                                    {
+                                        if($cy >= $yy * 3 && $cy < ($yy * 3) + 3)
+                                        {
+                                            for($x = $xx * 3; $x < ($xx * 3) + 3; $x++)
+                                            {
+                                                for($y = $yy * 3; $y < ($yy * 3) + 3; $y++)
+                                                {
+                                                    gameCells[$x][$y] = gameCells[$x][$y].replace(cell.innerText, "");
+                                                }
+                                            } 
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else if(!cell.classList.contains("input"))
+                        {
+                            // Replace single instance of numbers in Left to Right, and Top to Bottom
+                            for($xy = 0; $xy < 9; $xy++)
+                            {
+                                for($x = 1; $x <= 9; $x++)
+                                {
+                                    $xCounter = 0;
+                                    $yCounter = 0;
+                                    for($y = 0; $y <9; $y++)
+                                    {
+                                        if(gameCells[$xy][$y].includes($x.toString()))
+                                        {
+                                            $xCounter++;
+                                        }
+                                        if(gameCells[$y][$xy].includes($x.toString()))
+                                        {
+                                            $yCounter++;
+                                        }
+                                    }
+                                    if($xCounter == 1)
+                                    {
+                                        if(gameCells[$xy][$cy].includes($x.toString()))
+                                        {
+                                            gameCells[$xy][$cy] = $x.toString();
+                                        }
+                                    }
+                                    if($yCounter == 1)
+                                    {
+                                        if(gameCells[$cy][$xy].includes($x.toString()))
+                                        {
+                                            gameCells[$cy][$xy] = $x.toString();
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Replace single instance of numbers in each 3x3 grid
+                            for($yy = 0; $yy < 3; $yy++)
+                            {
+                                for($xx = 0; $xx < 3; $xx++)
+                                {
+                                    if($cy >= $yy * 3 && $cy < ($yy * 3) + 3)
+                                    {
+                                        if($cx >= $xx * 3 && $cx < ($xx * 3) + 3)
+                                        {
+                                            for($i = 1; $i <= 9; $i++)
+                                            {
+                                                $counter = 0;
+                                                for($y = $yy * 3; $y < ($yy * 3) + 3; $y++)
+                                                {
+                                                    for($x = $xx * 3; $x < ($xx * 3) + 3; $x++)
+                                                    {
+                                                        if(gameCells[$x][$y].includes($i.toString()))
+                                                        {
+                                                            $counter++;
+                                                        }
+                                                    }
+                                                }
+                                                if($counter == 1)
+                                                {
+                                                    if(gameCells[$cx][$cy].includes($i.toString()))
+                                                    {
+                                                        gameCells[$cx][$cy] = $i.toString();
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    for($x = 0; $x < 9; $x++)
+                    {
+                        for($y = 0; $y < 9; $y++)
+                        {
+                            $test = gameCells[$x][$y].replace(/\s/g, "");
+                            if($test <= 9)
+                            {
+                                gameCells[$x][$y] = $test;
+                                const cell = document.getElementById(parseInt($x + 1) + "x" + parseInt($y + 1));
+                                if(!cell.classList.contains("filled"))
+                                {
+                                    cell.classList.add("filled");
+                                    cell.classList.add("solved");
+                                    cell.innerText = $test;
+                                }
+                            }
+                        }   
+                    }
+                    cells.forEach((cell) =>
+                    {
+                        if(!cell.classList.contains("input") && !cell.classList.contains("filled"))
+                        {
+                            $cx = parseInt(cell.getAttribute("x")) - 1;
+                            $cy = parseInt(cell.getAttribute("y")) - 1;
+                            cell.innerText = gameCells[$cx][$cy];
+                        }
+                    });
+
+                    $numberOfSolved = 0;
+                    cells.forEach((cell) =>
+                    {
+                        if(!cell.classList.contains("input"))
+                        {
+                            if(cell.classList.contains("filled"))
+                            {
+                                $numberOfSolved++;
+                            }
+                        }
+                    });
+                    if($numberOfSolved == 81)
+                    {
+                        solved = true;
+                        const popup = document.getElementById("popup");
+                        popup.innerText = "Solved!";
+                        popup.style.opacity = 1;
+                        popup.style.zIndex = 100;
+                        clearInterval(solver);
+                        popup.addEventListener("click", function()
+                        {
+                            popup.style.opacity = 0;
+                            popup.style.zIndex = -100;
+                        })
+                    }
+
+                }
+
+                function gameReset()
+                {
+                    const cells = document.querySelectorAll(".cell");
+                    cells.forEach((cell)=>
+                    {
+                        if(!cell.classList.contains("input"))
+                        {
+                            cell.classList.remove("active");
+                            cell.classList.remove("filled");
+                            cell.innerText = "";
+                        }
+                    });
+
+                    data = "[";
+                    for($x = 1; $x <= 9; $x++)
+                    {
+                        for($y = 1; $y <= 9; $y++)
+                        {
+                            data += '{"x":'+ $x+ ',"y":' + $y + ',"v":"0","note":"1 2 3 4 5 6 7 8 9 "},';
+                        }   
+                    }
+                    data = JSON.parse(data.substr(0,data.length - 1) + "]");
+                    for($x = 0; $x < 9; $x++)
+                    {
+                        for($y = 0; $y < 9; $y++)
+                        {
+                            gameCells[$x][$y] = "1 2 3 4 5 6 7 8 9 ";
+                        }   
+                    }
+
+                    clearInterval(solver);
+                }
+
+                demoSetup();
+
+                function demoSetup()
+                {
+                    var demoArray = [[
+                        {x:1,y:2,v:1},
+                        {x:1,y:9,v:8},
+                        {x:2,y:1,v:6},
+                        {x:2,y:4,v:1},
+                        {x:2,y:7,v:4},
+                        {x:2,y:9,v:9},
+                        {x:3,y:1,v:7},
+                        {x:3,y:3,v:4},
+                        {x:3,y:6,v:8},
+                        {x:3,y:7,v:1},
+                        {x:3,y:9,v:2},
+                        {x:4,y:2,v:9},
+                        {x:4,y:3,v:7},
+                        {x:4,y:7,v:2},
+                        {x:4,y:9,v:4},
+                        {x:5,y:2,v:4},
+                        {x:5,y:3,v:2},
+                        {x:5,y:5,v:1},
+                        {x:5,y:9,v:7},
+                        {x:6,y:3,v:8},
+                        {x:6,y:4,v:4},
+                        {x:6,y:8,v:1},
+                        {x:7,y:2,v:5},
+                        {x:7,y:4,v:3},
+                        {x:7,y:5,v:4},
+                        {x:7,y:6,v:9},
+                        {x:7,y:7,v:7},
+                        {x:8,y:3,v:3},
+                        {x:8,y:5,v:5},
+                        {x:8,y:6,v:6},
+                        {x:8,y:7,v:8},
+                        {x:8,y:8,v:9},
+                        {x:9,y:1,v:9},
+                        {x:9,y:2,v:2},
+                        {x:9,y:4,v:8},
+                        {x:9,y:6,v:1},
+                        {x:9,y:7,v:3},
+                        {x:9,y:8,v:4}
+                    ],[
+                        {x:1,y:2,v:8},
+                        {x:1,y:5,v:2},
+                        {x:2,y:7,v:6},
+                        {x:2,y:8,v:8},
+                        {x:2,y:9,v:7},
+                        {x:3,y:2,v:7},
+                        {x:3,y:4,v:6},
+                        {x:3,y:6,v:3},
+                        {x:3,y:7,v:2},
+                        {x:3,y:8,v:5},
+                        {x:4,y:1,v:6},
+                        {x:4,y:4,v:1},
+                        {x:4,y:9,v:9},
+                        {x:5,y:2,v:4},
+                        {x:5,y:4,v:5},
+                        {x:5,y:5,v:9},
+                        {x:5,y:6,v:8},
+                        {x:5,y:7,v:1},
+                        {x:5,y:8,v:6},
+                        {x:6,y:2,v:9},
+                        {x:6,y:6,v:4},
+                        {x:6,y:8,v:3},
+                        {x:7,y:1,v:9},
+                        {x:7,y:2,v:6},
+                        {x:7,y:5,v:7},
+                        {x:8,y:1,v:4},
+                        {x:8,y:7,v:8},
+                        {x:8,y:9,v:1},
+                        {x:9,y:1,v:8},
+                        {x:9,y:4,v:3}
+                    ],[
+                        {x:1,y:1,v:6},
+                        {x:1,y:3,v:9},
+                        {x:1,y:4,v:8},
+                        {x:1,y:5,v:7},
+                        {x:1,y:6,v:1},
+                        {x:2,y:2,v:5},
+                        {x:2,y:4,v:3},
+                        {x:2,y:7,v:6},
+                        {x:3,y:7,v:1},
+                        {x:3,y:9,v:9},
+                        {x:4,y:3,v:5},
+                        {x:4,y:6,v:7},
+                        {x:5,y:3,v:3},
+                        {x:5,y:5,v:1},
+                        {x:5,y:8,v:6},
+                        {x:6,y:4,v:6},
+                        {x:6,y:7,v:4},
+                        {x:7,y:1,v:9},
+                        {x:7,y:5,v:6},
+                        {x:7,y:6,v:4},
+                        {x:7,y:8,v:5},
+                        {x:8,y:1,v:4},
+                        {x:8,y:2,v:3},
+                        {x:8,y:7,v:2},
+                        {x:9,y:2,v:8},
+                        {x:9,y:6,v:2},
+                        {x:9,y:7,v:9},
+                        {x:9,y:9,v:7}
+                    ],[
+                        {x:1,y:1,v:8},
+                        {x:1,y:6,v:1},
+                        {x:2,y:2,v:7},
+                        {x:2,y:5,v:4},
+                        {x:3,y:2,v:6},
+                        {x:3,y:8,v:1},
+                        {x:3,y:9,v:5},
+                        {x:4,y:4,v:8},
+                        {x:4,y:9,v:2},
+                        {x:5,y:4,v:3},
+                        {x:5,y:5,v:9},
+                        {x:5,y:6,v:4},
+                        {x:6,y:4,v:7},
+                        {x:6,y:7,v:6},
+                        {x:6,y:9,v:8},
+                        {x:7,y:1,v:9},
+                        {x:7,y:3,v:3},
+                        {x:7,y:8,v:8},
+                        {x:8,y:3,v:4},
+                        {x:8,y:6,v:7},
+                        {x:8,y:7,v:3},
+                        {x:9,y:7,v:9}
+                    ],[
+                        {x:1,y:3,v:6},
+                        {x:1,y:5,v:3},
+                        {x:1,y:8,v:5},
+                        {x:1,y:9,v:2},
+                        {x:2,y:2,v:1},
+                        {x:2,y:6,v:7},
+                        {x:3,y:7,v:4},
+                        {x:4,y:3,v:2},
+                        {x:4,y:5,v:5},
+                        {x:4,y:8,v:8},
+                        {x:4,y:9,v:3},
+                        {x:5,y:9,v:9},
+                        {x:6,y:1,v:6},
+                        {x:6,y:4,v:2},
+                        {x:7,y:3,v:8},
+                        {x:7,y:7,v:9},
+                        {x:8,y:5,v:4},
+                        {x:8,y:7,v:6},
+                        {x:9,y:1,v:7},
+                        {x:9,y:6,v:3},
+                        {x:9,y:8,v:4},
+                        {x:9,y:9,v:8}
+                    ]];
+                    var demo = demoArray[parseInt(Math.random() * demoArray.length)];
+                    const cells = document.querySelectorAll(".cell")
+                    cells.forEach((cell)=>
+                    {
+                        demo.forEach((demoValue) =>
+                        {
+                            if(cell.getAttribute("x") == demoValue.x && cell.getAttribute("y") == demoValue.y)
+                            {
+                                cell.innerText = demoValue.v;
+                                cell.classList.add("filled");
+                            }
+                        });
+                    });
+                }
+            
+            }
+
+        </script>
+        <style>
+            *
+            {
+                box-sizing: border-box;
+                overflow: hidden;
+            }
+            body
+            {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                font-family: sans-serif;
+                font-size: 24px;
+            }
+            #game
+            {
+                width: 437px;
+            }
+            header
+            {
+                display: block;
+                width: 100%;
+                font-size: 3.2rem;
+                font-weight: 900;
+                text-shadow: 0.4rem 0.4rem 0.4rem #888;
+            }
+            .grid--light::after
+            {
+                content: "";
+                position: absolute;
+                inset: 0;
+                z-index: 10;
+                opacity: 0.25;
+                background-color: #8cf;
+            }
+            .cell
+            {
+                position: relative;
+                width: 48px;
+                height: 48px;
+                border: 1px solid #000;
+                display: inline-block;
+                text-align: center;
+                padding: 8px;
+                cursor: pointer;
+                transition: 250ms ease-in-out;
+            }
+            .cell:not(.filled, .input)
+            {
+                padding: 0 2px;
+                font-size: 14px;
+                word-wrap: normal;
+            }
+            .cell.filled
+            {
+                background-color: #ddd;
+                color: #336;
+            }
+            .cell.filled.solved
+            {
+                color: #393;
+            }
+            .cell:hover:not(.input),.cell:hover:not(.filled)
+            {
+                background-color: #ccc;
+                color: #444;
+            }
+            .input
+            {
+                background-color: #0094ff;
+                color: #fff;
+                margin-top: 24px;
+            }
+            .input:hover:not(.active)
+            {
+                background-color: #004277;
+                color: #777;
+            }
+            .active
+            {
+                background-color: #8888ff;
+            }
+            #buttons
+            {
+                width: 100%;
+                display: block;
+                text-align: center;
+            }
+            button
+            {
+                display: inline-block;
+                padding: 8px 16px;
+                border-radius: 8px;
+                background-color: #000;
+                color: #fff;
+                border: none;
+                outline: none;
+                margin: 8px;
+                cursor: pointer;
+                transition: 250ms ease-in-out;
+            }
+            .button:hover
+            {
+                color: #000;
+            }
+            #solve
+            {
+                background-color: #484;
+            }
+            #reset
+            {
+                background-color: #844;
+            }
+            #solve:hover
+            {
+                background-color: #4f4;
+            }
+            #reset:hover
+            {
+                background-color: #f44;
+            }
+            #demo
+            {
+                background-color: #448;
+            }
+            #demo:hover
+            {
+                background-color: #44f;
+            }
+            #popup
+            {
+                position: fixed;
+                inset: 33%;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                background-color: #004277;
+                color: #fff;
+                border-radius: 3.2rem;
+                box-shadow: 0 0 0.4rem #000;
+                z-index: -100;
+                opacity: 0;
+                transition: 250ms ease-in-out;
+                font-size: 5vw;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="game">
+            <header>Sudoku Helper</header>
+        </div>
+        <div id="popup"></div>
+    </body>
+</html>
